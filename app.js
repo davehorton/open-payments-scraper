@@ -13,131 +13,241 @@ if( argv.length < 2 || !argv.user || !argv.password ) {
 	return ;
 }
 
-debug('connecting to cms portal...')
-request('https://portal.cms.gov/wps/myportal', function(error, response, body){
-	if( error ) throw error ;
-	if( response.statusCode !== 200 ) throw new Error('failed to connect to cms.gov') ;
-	
-	debug('Accepting terms..') ;
-
-	r({
-		uri: 'https://eidm.cms.gov/EIDMLoginApp/userlogin.jsp'
-		,method: 'POST'
-		,form: {
-			terms: 'accept'
-			,termsaccepted: 'I Accept'			
-		}
-	}, function( err, response, body ){
-		if( err ) throw err ;
-		if( response.statusCode !== 200 ) throw new Error('post to I accept: ' + response.statusCode) ;
-
-		debug('Logging in...') ;
-
-		r({
-			uri: 'https://eidm.cms.gov/oam/server/auth_cred_submit'
-			,method: 'POST'
-			,form: {
-				userid: argv.user
-				,password: argv.password
-				,submit: 'Log In'
-			}
-		}, function(err, response, body){
-			if( err ) throw err ;
-
-			if( response.statusCode === 302 ) {
-				request(response.headers['location'], function(err, response, body){
-					if( err ) throw err ;
-					if( response.statusCode !== 200 ) throw new Error('response to get of provided location: ' + response.statusCode) ;
-
-					debug('Successfully logged in!') ;
-					debug('Selecting dropdown for open payments...') ;
-					var $ = cheerio.load(body); 
-					var href = $('a.navflySub2[href*="/wps/myportal/cmsportal/op/op_reg"]').attr('href') ;
-					if( !href ) throw new Error('did not get expected welcome page') ;
-
-					r('https://portal.cms.gov' + href, function(err, response, body){
-						if( err ) throw err ;
-						if( response.statusCode !== 200 ) throw new Error('response navigating to open payments page %d', response.statusCode);
-
-						debug('selecting review and dispute...') ;
-						var $ = cheerio.load(body) ;
-						var form = $('.cmsPortletContainerThin form') ;
-						if( !form ) throw new Error('cant find form') ;
-
-						//debug('next POST will be to: %s', form.attr('action')) ;
-						//debug('form html is ', form.html()) ;
-						var a = form.find('div.top-nav ul li').eq(1).find('a') ;
-						if(!a) debug('couldnt find anchor') ;
-						
-						var formData = {} ;
-						formData[a.attr('id')] = a.attr('id') ;
-						formData[form.attr('id')] = form.attr('id') ;
-						formData['javax.faces.ViewState'] = 'j_id1:j_id2' ;
-
-						r({
-							uri: 'https://portal.cms.gov' + form.attr('action')
-							,method: 'POST'
-							,form: formData
-						}, function(err, response, body) {
-							if( err ) throw err ;
-							//debug('response to selecting review and dispute was %d', response.statusCode) ;
-							//debug('response html: %s', body) ;
-							//
-							var $ = cheerio.load(body) ;
-							var options = $('.ProfileResults .FormRow.grid_400').eq(0).find('select option') ;
-							debug('Found %d physicians', options.length -1 ) ;
-
-							var hcps = [] ;
-							options.each( function(idx, el){
-								if( 0 == idx ) return ;
-								hcps.push({
-									name: $(this).html() 
-									,org: $(this).attr('value') 
-									,data: []
-								}) ;
-							}) ;
-
-							getAllHcpData( hcps, body, function( err ) {
-								if( err ) throw err ;
-								writeHcpData( hcps ) ;
-							}) ;
-						})
-					}) ;
-				}) ;
-			}
-		})
-	}) ;
+runIt( function(err) {
+	if( err ) console.log(err) ;
+	else debug('completed')
 }) ;
 
-function navigateBack(body, callback) {
+function runIt( callback ) {
+	console.log('connecting to cms portal...')
+	request('https://portal.cms.gov/wps/myportal', function(error, response, body){
+		if( error ) throw error ;
+		if( response.statusCode !== 200 ) return callback('failed to connect to cms.gov') ;
+		
+		console.log('Accepting terms..') ;
+
+		r({
+			uri: 'https://eidm.cms.gov/EIDMLoginApp/userlogin.jsp'
+			,method: 'POST'
+			,form: {
+				terms: 'accept'
+				,termsaccepted: 'I Accept'			
+			}
+		}, function( err, response, body ){
+			if( err ) throw err ;
+			if( response.statusCode !== 200 ) return callback('post to I accept: ' + response.statusCode) ;
+
+			console.log('Logging in...') ;
+
+			r({
+				uri: 'https://eidm.cms.gov/oam/server/auth_cred_submit'
+				,method: 'POST'
+				,form: {
+					userid: argv.user
+					,password: argv.password
+					,submit: 'Log In'
+				}
+			}, function(err, response, body){
+				if( err ) throw err ;
+
+				if( response.statusCode === 302 ) {
+					request(response.headers['location'], function(err, response, body){
+						if( err ) throw err ;
+						if( response.statusCode !== 200 ) return callback('response to get of provided location: ' + response.statusCode) ;
+
+						console.log('Successfully logged in....') ;
+						console.log('selecting dropdown for open payments portal...') ;
+						var $ = cheerio.load(body); 
+						var href = $('a.navflySub2[href*="/wps/myportal/cmsportal/op/op_reg"]').attr('href') ;
+						if( !href ) return callback('did not get expected welcome page') ;
+
+						r('https://portal.cms.gov' + href, function(err, response, body){
+							if( err ) throw err ;
+							if( response.statusCode !== 200 ) throw new Error('response navigating to open payments page %d', response.statusCode);
+
+							if( -1 !== body.indexOf('This portlet is unavailable.') ) return callback('Darn, CMS open payment system is down :(')
+
+							debug('selecting review and dispute...') ;
+							var $ = cheerio.load(body) ;
+							var form = $('.cmsPortletContainerThin form') ;
+							if( !form ) throw new Error('cant find form') ;
+
+							var a = form.find('div.top-nav ul li').eq(1).find('a') ;
+							if(!a) debug('couldnt find anchor') ;
+							
+							var formData = {} ;
+							formData[a.attr('id')] = a.attr('id') ;
+							formData[form.attr('id')] = form.attr('id') ;
+							formData['javax.faces.ViewState'] = 'j_id1:j_id2' ;
+
+							r({
+								uri: 'https://portal.cms.gov' + form.attr('action')
+								,method: 'POST'
+								,form: formData
+							}, function(err, response, body) {
+								if( err ) return callback( err ) ;
+								//debug('response to selecting review and dispute was %d', response.statusCode) ;
+								//debug('response html: %s', body) ;
+								//
+								var $ = cheerio.load(body) ;
+								var options = $('.ProfileResults .FormRow.grid_400').eq(0).find('select option') ;
+								debug('Found %d physicians', options.length -1 ) ;
+
+								var hcps = [] ;
+								options.each( function(idx, el){
+									if( 0 == idx ) return ;
+									hcps.push({
+										name: $(this).html() 
+										,org: $(this).attr('value') 
+										,data: []
+									}) ;
+								}) ;
+
+								getAllHcpData( hcps, body, function( err, hcps ) {
+									if( err ) return callback( err ) ;
+									writeHcpData( hcps ) ;
+									callback(null) ;
+								}) ;
+							})
+						}) ;
+					}) ;
+				}
+			})
+		}) ;
+	}) ;
+};
+
+function navigateBack(body, hcp, callback) {
 	var $ = cheerio.load(body) ;
 	var form = $('form') ;
 	var button = form.find('input[value="Back"]') ;
 	var hidden = form.find('input[type="hidden"]') ;
 	var action = form.attr('action') ;
 
-	//let's get all of the inputs
-	var formData = {} ;
-	var input = form.find('input') ;
-	input.each( function() {
-		var name = $(this).attr('name') ;
-		var value = $(this).attr('value') ;
-		var type = $(this).attr('type') ;
+	var tr = $('.CallOut.fullCallOut table.SearchDataTable > tbody > tr') ;
+	hcp.transactions = [] ;
+	tr.each( function() {
 
-		if( type === 'checkbox' || type === 'image') return ;
+		var data = {} ;
+		var el = [null,'entity','record_id',null,'category','form_of_payment','nature_of_payment','transaction_date',
+			'amount','delay_in_pub','last_modified_date','current_standing','review_status','dispute_date','dispute_last',
+			'affirmed'] ;
 
-		if( type === 'submit' && value !== 'Back') return ;
+		for( var i = 0; i < 16; i++ ) {
+			if( 0 == i || 3 == i ) continue ;
+			data[el[i]] = $(this).find('td').eq(i).find('div').html() ;
+		}
 
-		formData[name] = value || null;
+		var js = $(this).find('td').eq(17).find('a').attr('onclick') ;
+		var re = /jsfcljs\(document.forms\['(\S+)'],{'(\S+)':'(\S+)'/ ;
+		var arr = re.exec( js ) ;
+
+		var obj = {} ;
+		obj[arr[1]] = arr[1] ;
+		obj[arr[2]] = arr[2] ;
+
+		hcp.transactions.push( {
+			data: data
+			,detail_form_data: obj 
+		}) ;
 	}) ;
 
-	r({
-		uri: 'https://portal.cms.gov' + action
-		,method: 'POST'
-		,form: formData
-	}, function(err, response, body) {
-		if( err ) return callback(err) ;
-		callback(null, body) ;
+	async.eachSeries( hcp.transactions, function(txn, cb){
+		debug('getting detail for %s', txn.data.entity ) ;
+
+		var vs = form.find('input[name="javax.faces.ViewState"]').attr('value') ;
+		r({
+			uri: 'https://portal.cms.gov' + form.attr('action')
+			,method: 'POST'
+			,form: merge( txn.detail_form_data, {'javax.faces.ViewState': vs})
+		}, function(err, response, body){
+			if( err ) return cb(err) ;
+			$ = cheerio.load(body) ;
+
+			//TODO: get detail data
+			var h2 = $('.GettingStarted > .LeftSide > .TabContent > .TextArea > .ProfileResults > .TextArea > .ProfileResults > h2');
+			if( h2.length === 4 ) {
+				//payment
+				var div = $('.GettingStarted > .LeftSide > .TabContent > .TextArea > .ProfileResults > .TextArea > .ProfileResults .grid_625');
+				div.each( function(idx, d){
+					var span = $(d).find('span') ;
+					if( !!span && span.children.length && 3 == d.children.length) {
+						var text = d.children[2].data.trim() ; 
+						var nm = [null,null,null,'recipient_type','first','middle','last','suffix','address1',
+						'address2','city','state','zipcode','country','province','postal_code','email','physician_type',
+						'npi','specialty','lic_state1','lic_no1','lic_state2','lic_no2','lic_state3','lic_no3',
+						'lic_state4','lic_no4','lic_state5','lic_no5','associated_drug','prod_indicator',
+						'name_drug','natl_drug_code','name_device',null,'total_payment','date_payment','num_payments','form_payment','nature_payment',
+						null,'ownership_indicator','third_party_payment','third_party_name','charity','third_party_is_covered_recip',
+						'delay_in_pub','contextual_info'] ;
+						if( idx < nm.length && nm[idx] !== null ) txn.data[nm[idx]] = text ;
+					}
+				}) ;
+			}
+			else {
+				var span = $('span.paddingLfRt10');
+				span.each( function(idx){
+					var spans = $(this).closest('td').find('span') ;
+					if( spans && spans.length === 2 ) {
+						var text = spans.eq(1).html() ;
+						var nm = ['first','middle','last','suffix','address1','address2','city','state','zipcode','country',
+						'province','postal_code','email','physician_type','npi','specialty','lic_state1','lic_no1','lic_state2','lic_no2',
+						'lic_state3','lic_no3','lic_state4','lic_no4','lic_state5','lic_no5','gpo_reporting_name',
+						'gpo_reporting_id','interest_held_by','investment_amount','investment_value','investment_terms'] ;
+						txn.data[nm[idx]] = text ;
+					}
+				})
+			}
+
+			//back
+			form = $('form') ;
+			var formId = form.attr('id') ;
+			var button = form.find('.ButtonRow .leftSide input[type=submit]') ;
+			vs = form.find('input[name="javax.faces.ViewState"]').attr('value') ;
+
+			var fd = {} ;
+			fd['javax.faces.ViewState'] = vs ;
+			fd[formId] = formId ;
+			fd[button.attr('name')] = 'Back' ;
+
+			r({
+				uri: 'https://portal.cms.gov' + form.attr('action')
+				,method: 'POST'
+				,form: fd
+			}, function(err, response, body){
+				if( err ) return cb(err) ;
+
+				$ = cheerio.load(body) ;
+				form = $('form') ;
+				cb(null) ;
+			}) ;
+		}); 
+	}, function(err){
+		debug('got all detail, returning to summary page with hcp listing')
+		//debug('hcp.transactions: ', hcp.transactions )
+
+		var formData = {} ;
+		var input = form.find('input') ;
+		input.each( function() {
+			var name = $(this).attr('name') ;
+			var value = $(this).attr('value') ;
+			var type = $(this).attr('type') ;
+
+			if( type === 'checkbox' || type === 'image') return ;
+
+			if( type === 'submit' && value !== 'Back') return ;
+
+			formData[name] = value || null;
+		}) ;
+
+		r({
+			uri: 'https://portal.cms.gov' + action
+			,method: 'POST'
+			,form: formData
+		}, function(err, response, body) {
+			if( err ) return callback(err) ;
+			callback(null, body, hcp) ;
+		}) ;
 	}) ;
 }
 
@@ -177,11 +287,12 @@ function getAllHcpData( hcps, body, cb ) {
 					,form: obj.form
 				}, function(err, response, body){
 					if( err ) return callback(err) ;
-					hcp.data = readHcpData( body ) ;
-					if( hcp.data.length ) {
-						debug('hitting back button')
-						navigateBack( body, function(err, body ) {
+					//hcp.data = readHcpData( body ) ;
+					if( !nodatafound( body ) ) {
+						debug('getting hcp detail and then hitting back button')
+						navigateBack( body, hcp, function(err, body, hcpData ) {
 							if( err ) return callback(err) ;
+							hcp = hcpData ;
 							callback(null, updateFormData(body) ) ;
 						}) ;
 					}
@@ -204,10 +315,11 @@ function getAllHcpData( hcps, body, cb ) {
 					,form: obj.form
 				}, function(err, response, body){
 					if( err ) return callback(err) ;
-					hcp.data = readHcpData( body ) ;
-					if( hcp.data.length ) {
-						navigateBack( body, function(err, body ) {
+					//hcp.data = readHcpData( body ) ;
+					if( !nodatafound( body ) ) {
+						navigateBack( body, hcp, function(err, body, hcpData ) {
 							if( err ) return callback(err) ;
+							hcp = hcpData ;
 							callback(null, updateFormData(body) ) ;
 						}) ;
 					}
@@ -221,12 +333,15 @@ function getAllHcpData( hcps, body, cb ) {
 
 	async.waterfall( tasks, function( err, results ){
 		if( err ) return cb(err) ;
-		cb(null) ;
+		cb(null, hcps) ;
 	})
 }
 function getvs( body ) {
 	var $ = cheerio.load( body ) ;
 	return $('form input[name="javax.faces.ViewState"]').attr('value') ;
+}
+function nodatafound( body ) {
+	return  -1 !== body.indexOf('There are no payments or other transfers of value') ;
 }
 function readHcpData( body ) {
 
@@ -325,17 +440,21 @@ function logOutput( err, response, body, opts, callback ) {
 }
 
 function writeHcpData( hcps, callback ) {
+	//debug('time to write hcp data: ', JSON.stringify(hcps)) ;
+	var names = getAttributeName() ;
+
 	hcps.forEach( function(hcp){
 		var filename = argv.outdir + '/' + hcp.name.toLowerCase().replace(/ /g,'_') + '.csv' ;
 		debug('writing data for %s to %s', hcp.name, filename) ;
 		var stream = fs.createWriteStream(filename);
 		stream.once('open', function(fd){
-			stream.write('organization,record id,category,form of payment,nature of payment,date,amount,delay in publication?,' + 
-				'last modified,current standing,review status,date dispute initiated,last modified by,affirmed,history\n') ;
-			hcp.data.forEach( function(payment){
-				payment.forEach( function(val, idx) {
+			stream.write(names.join(',') + '\n') ;
+			hcp.transactions.forEach( function(txn){
+				names.forEach( function(name, idx) {
 					if( 0 != idx ) stream.write(',') ;
-					stream.write('"' + val + '"') ;
+
+					if( txn.data[name] ) stream.write('"' + txn.data[name] + '"') ;
+					else stream.write('') ;
 				})
 				stream.write('\n') ;
 			}) ;
@@ -343,5 +462,17 @@ function writeHcpData( hcps, callback ) {
 		}) ;
 	}) ;
 	return ;
+}
+
+function getAttributeName() {
+
+	return ['record_id','entity','transaction_date','amount','category','form_of_payment','nature_of_payment',
+	'investment_amount','investment_value','investment_terms','delay_in_pub','last_modified_date','current_standing',
+	'review_status','dispute_date','dispute_last','affirmed','recipient_type','first','middle','last','suffix','address1',
+	'address2','city','state','zipcode','country','province','postal_code','email','physician_type','npi','specialty',
+	'lic_state1','lic_no1','lic_state2','lic_no2','lic_state3','lic_no3','lic_state4','lic_no4','lic_state5','lic_no5',
+	'associated_drug','prod_indicator','name_drug','natl_drug_code','name_device','total_payment','date_payment','num_payments',
+	'form_payment','nature_payment','ownership_indicator','third_party_payment','third_party_name','charity',
+	'third_party_is_covered_recip','contextual_info','gpo_reporting_name','gpo_reporting_id','interest_held_by'] ;
 
 }
