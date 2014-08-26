@@ -9,7 +9,7 @@ var argv = require('minimist')(process.argv.slice(2))
 var fs = require('fs')
 
 if( argv.length < 2 || !argv.user || !argv.password ) {
-	console.error('usage: node app --user <username> --password <password> --outdir <folder>') ;
+	console.error('usage: node app --user <username> --password <password> --outdir <folder> --debug_files <folder>') ;
 	return ;
 }
 
@@ -17,6 +17,8 @@ runIt( function(err) {
 	if( err ) console.log(err) ;
 	else debug('completed')
 }) ;
+
+var $ ;
 
 function runIt( callback ) {
 	console.log('connecting to cms portal...')
@@ -48,16 +50,16 @@ function runIt( callback ) {
 					,submit: 'Log In'
 				}
 			}, function(err, response, body){
-				if( err ) throw err ;
+				if( err ) return callback( err ) ;
 
 				if( response.statusCode === 302 ) {
-					request(response.headers['location'], function(err, response, body){
+					r(response.headers['location'], function(err, response, body){
 						if( err ) throw err ;
 						if( response.statusCode !== 200 ) return callback('response to get of provided location: ' + response.statusCode) ;
 
 						console.log('Successfully logged in....') ;
 						console.log('selecting dropdown for open payments portal...') ;
-						var $ = cheerio.load(body); 
+						//$ = cheerio.load(body); 
 						var href = $('a.navflySub2[href*="/wps/myportal/cmsportal/op/op_reg"]').attr('href') ;
 						if( !href ) return callback('did not get expected welcome page') ;
 
@@ -68,7 +70,7 @@ function runIt( callback ) {
 							if( -1 !== body.indexOf('This portlet is unavailable.') ) return callback('Darn, CMS open payment system is down :(')
 
 							debug('selecting review and dispute...') ;
-							var $ = cheerio.load(body) ;
+							//var $ = cheerio.load(body) ;
 							var form = $('.cmsPortletContainerThin form') ;
 							if( !form ) throw new Error('cant find form') ;
 
@@ -86,20 +88,20 @@ function runIt( callback ) {
 								,form: formData
 							}, function(err, response, body) {
 								if( err ) return callback( err ) ;
-								//debug('response to selecting review and dispute was %d', response.statusCode) ;
-								//debug('response html: %s', body) ;
-								//
-								var $ = cheerio.load(body) ;
+
+								//var $ = cheerio.load(body) ;
 								var options = $('.ProfileResults .FormRow.grid_400').eq(0).find('select option') ;
 								debug('Found %d physicians', options.length -1 ) ;
 
 								var hcps = [] ;
 								options.each( function(idx, el){
 									if( 0 == idx ) return ;
+									debug($(this).html()) ;
 									hcps.push({
 										name: $(this).html() 
 										,org: $(this).attr('value') 
 										,data: []
+										,transactions: []
 									}) ;
 								}) ;
 
@@ -117,15 +119,13 @@ function runIt( callback ) {
 	}) ;
 };
 
-function navigateBack(body, hcp, callback) {
-	var $ = cheerio.load(body) ;
-	var form = $('form') ;
-	var button = form.find('input[value="Back"]') ;
-	var hidden = form.find('input[type="hidden"]') ;
-	var action = form.attr('action') ;
+function getOnePageOfHcpData( hcp, page, numPages, callback ) {
+	debug('retrieving data for page %d of %d for %s', page, numPages, hcp.name) ;
 
+	var start = hcp.transactions.length ;
+	var form = $('form') ;
 	var tr = $('.CallOut.fullCallOut table.SearchDataTable > tbody > tr') ;
-	hcp.transactions = [] ;
+
 	tr.each( function() {
 
 		var data = {} ;
@@ -146,25 +146,29 @@ function navigateBack(body, hcp, callback) {
 		obj[arr[1]] = arr[1] ;
 		obj[arr[2]] = arr[2] ;
 
-		hcp.transactions.push( {
+		hcp.transactions.push({
 			data: data
 			,detail_form_data: obj 
 		}) ;
 	}) ;
 
-	async.eachSeries( hcp.transactions, function(txn, cb){
-		debug('getting detail for %s', txn.data.entity ) ;
+	//get the detail for each transaction, coming back to the hcp summary page after each
+	async.eachSeries( hcp.transactions.slice(start), function(txn, cb){
+		debug('getting detail for %s, record id %s', txn.data.entity, txn.data.record_id ) ;
 
-		var vs = form.find('input[name="javax.faces.ViewState"]').attr('value') ;
+		button = form.find('input[value="Back"]') ;
+		hidden = form.find('input[type="hidden"]') ;
+		action = form.attr('action') ;
+		vs = form.find('input[name="javax.faces.ViewState"]').attr('value') ;
 		r({
 			uri: 'https://portal.cms.gov' + form.attr('action')
 			,method: 'POST'
 			,form: merge( txn.detail_form_data, {'javax.faces.ViewState': vs})
 		}, function(err, response, body){
 			if( err ) return cb(err) ;
-			$ = cheerio.load(body) ;
 
-			//TODO: get detail data
+			var recordId = $('.GettingStarted > .LeftSide > .TabContent > .TextArea > .ProfileResults > .TextArea > .ProfileResults > h1') ;
+			//debug('got detail page for %s', recordId.html().trim()) ;
 			var h2 = $('.GettingStarted > .LeftSide > .TabContent > .TextArea > .ProfileResults > .TextArea > .ProfileResults > h2');
 			if( h2.length === 4 ) {
 				//payment
@@ -203,7 +207,7 @@ function navigateBack(body, hcp, callback) {
 			form = $('form') ;
 			var formId = form.attr('id') ;
 			var button = form.find('.ButtonRow .leftSide input[type=submit]') ;
-			vs = form.find('input[name="javax.faces.ViewState"]').attr('value') ;
+			vs = $('input[name="javax.faces.ViewState"]').attr('value') ;
 
 			var fd = {} ;
 			fd['javax.faces.ViewState'] = vs ;
@@ -216,15 +220,102 @@ function navigateBack(body, hcp, callback) {
 				,form: fd
 			}, function(err, response, body){
 				if( err ) return cb(err) ;
-
-				$ = cheerio.load(body) ;
 				form = $('form') ;
 				cb(null) ;
 			}) ;
 		}); 
 	}, function(err){
+		//completed getting one page of data
+		//navigate to next page if there are more pages
+		
+		if( err ) return callback(err) ;
+
+		debug('retrieved page %d of %d', page, numPages) ;
+
+		if( page == numPages ) {
+			debug('got all pages for %s, returning', hcp.name) ;
+			return callback() ;
+		}
+
+		//go to next page
+		var form = $('form') ;
+		var formId = form.attr('id') ;
+		var formData = {} ;
+		formData[formId] = formId ;
+
+		form.find('input[type=hidden]').each( function(){
+			var name = $(this).attr('name') ;
+			var value = $(this).attr('value') ;
+			formData[name] = value || null;
+
+		})
+		
+		form.find('select').each( function(){
+			var name = $(this).attr('name') ;
+			var value = $(this).attr('value') ;
+
+			if( -1 !== name.indexOf('reviewAndDisputeStatus') ) return ;
+
+			if( -1 !== name.indexOf('EntriesReturned')) value = 10 ;
+			formData[name] = value || null;
+
+		})
+
+		form.find('input[type=text]').each( function(){
+			var name = $(this).attr('name') ;
+			var value = $(this).attr('value') ;
+			if( -1 !== name.indexOf('pagerGoText') ) value = '' + (page+1) ;
+
+			formData[name] = value || null;
+
+		})
+		var go = form.find('input[value=Go]') ;
+		formData[go.attr('name')] = go.attr('value') ;
+
+		var fd = serialize(formData) ;
+		r({
+			uri: 'https://portal.cms.gov' + form.attr('action') 
+			,method: 'POST'
+			,form: fd
+		}, function(err, response, body) {
+			if( err ) return callback(err) ;
+			callback() ;
+		}) ;
+	}) ;
+}
+
+//When this function is called we are sitting on page 1 of the doc's page.
+//We need to collect all of the information on each page, and associated detail page
+//and end by navigating back to the overview page listing all of the docs in a dropdown
+function collectHcpDataAndNavigateBack(body, hcp, callback) {
+	hcp.transactions = [] ;
+
+	var pager = $('.CallOut.fullCallOut table.SearchDataTable > tfoot > tr:first-child > td:first-child > table tr:first-child > td:first-child > table > tbody > tr:first-child > td:nth-child(3) > span') ;
+	var reg = /Page 1 of (\d+)/ ;
+	var pageCount = reg.exec( pager.html() ) ;
+	var numPages = pageCount[1] ;
+	debug('Number of pages to traverse: %d', numPages) ;
+	var page = 1 ;
+
+	async.doWhilst( function(doWhilstCallback){
+		getOnePageOfHcpData( hcp, page, numPages, doWhilstCallback) ;
+	}
+	, function() { 
+		debug('got all data on page %d', page) ;
+		return ++page <= numPages ;
+	}
+	, function done(err){ 
+		//final callback - got all detail from all pages - navigate back
+		
+		if( err ) {
+			console.error('Error: ', err) ;
+			throw err ;
+		}
 		debug('got all detail, returning to summary page with hcp listing')
 		//debug('hcp.transactions: ', hcp.transactions )
+
+		var form = $('form') ;
+		var action = form.attr('action') ;
 
 		var formData = {} ;
 		var input = form.find('input') ;
@@ -249,10 +340,11 @@ function navigateBack(body, hcp, callback) {
 			callback(null, body, hcp) ;
 		}) ;
 	}) ;
+
 }
 
 function updateFormData( body ) {
-	$ = cheerio.load(body) ;
+	//$ = cheerio.load(body) ;
 	var form = $('form') ;
 	var formId = form.attr('id') ;
 	var button = form.find('input[value="Show Records"]') ;
@@ -287,10 +379,9 @@ function getAllHcpData( hcps, body, cb ) {
 					,form: obj.form
 				}, function(err, response, body){
 					if( err ) return callback(err) ;
-					//hcp.data = readHcpData( body ) ;
 					if( !nodatafound( body ) ) {
 						debug('getting hcp detail and then hitting back button')
-						navigateBack( body, hcp, function(err, body, hcpData ) {
+						collectHcpDataAndNavigateBack( body, hcp, function(err, body, hcpData ) {
 							if( err ) return callback(err) ;
 							hcp = hcpData ;
 							callback(null, updateFormData(body) ) ;
@@ -307,7 +398,6 @@ function getAllHcpData( hcps, body, cb ) {
 				obj.form[obj.formId+':orgSelected'] = hcp.org ;
 				obj.form[obj.formId+':PaymentYear'] = '2013' ;
 
-				//debug('getting data for %s: %s.....%s', hcp.name, loc.slice(0,70) + '...', fd['javax.faces.ViewState']) ;
 				debug('getting data for %s:', hcp.name) ;
 				r({
 					uri: obj.uri
@@ -315,9 +405,8 @@ function getAllHcpData( hcps, body, cb ) {
 					,form: obj.form
 				}, function(err, response, body){
 					if( err ) return callback(err) ;
-					//hcp.data = readHcpData( body ) ;
 					if( !nodatafound( body ) ) {
-						navigateBack( body, hcp, function(err, body, hcpData ) {
+						collectHcpDataAndNavigateBack( body, hcp, function(err, body, hcpData ) {
 							if( err ) return callback(err) ;
 							hcp = hcpData ;
 							callback(null, updateFormData(body) ) ;
@@ -337,8 +426,8 @@ function getAllHcpData( hcps, body, cb ) {
 	})
 }
 function getvs( body ) {
-	var $ = cheerio.load( body ) ;
-	return $('form input[name="javax.faces.ViewState"]').attr('value') ;
+	//var $ = cheerio.load( body ) ;
+	return $('input[name="javax.faces.ViewState"]').attr('value') ;
 }
 function nodatafound( body ) {
 	return  -1 !== body.indexOf('There are no payments or other transfers of value') ;
@@ -350,7 +439,7 @@ function readHcpData( body ) {
 		return [] ;
 	}
 
-	var $ = cheerio.load(body) ;
+	//var $ = cheerio.load(body) ;
 	var page = 1 ;
 	var pages = $('.CallOut.fullCallOut table.SearchDataTable tfoot table table tbody tr td')
 	.eq(2)
@@ -392,6 +481,8 @@ function r( opts, callback ) {
 	if( typeof opts === 'string') opts = {uri: opts, method: 'GET'} ;
 	
 	request(opts, function( err, response, body ) {
+		if( !err && body ) $ = cheerio.load(body) ;
+
 		if( argv.debug_files ) {
 			logOutput( err, response, body, opts, callback ) ;
 		} else callback( err, response, body ) ;
@@ -418,7 +509,7 @@ function logOutput( err, response, body, opts, callback ) {
 			,function writeBody(cb) {
 				var content ;
 				if( !err ) {
-					$ = cheerio.load(body) ;
+					//$ = cheerio.load(body) ;
 					var insert = '<div><p>This page retrieved with ' + opts.method + ' ' + opts.uri + '</p></div>' ;
 					if( opts.form ) {
 						insert += '<div><p>Form data passed: <pre>' + JSON.stringify(opts.form) + '</pre></p></div>' ;
@@ -449,6 +540,7 @@ function writeHcpData( hcps, callback ) {
 		var stream = fs.createWriteStream(filename);
 		stream.once('open', function(fd){
 			stream.write(names.join(',') + '\n') ;
+			debug('about to write transactions for hcp: ', hcp);
 			hcp.transactions.forEach( function(txn){
 				names.forEach( function(name, idx) {
 					if( 0 != idx ) stream.write(',') ;
@@ -462,6 +554,17 @@ function writeHcpData( hcps, callback ) {
 		}) ;
 	}) ;
 	return ;
+}
+function serialize(obj) {
+	var str = [];
+	for(var p in obj) {
+		if (obj.hasOwnProperty(p)) {
+			var value = obj[p] ;
+			if( null !== value ) str.push(encodeURIComponent(p) + "=" + encodeURIComponent(value));
+			else str.push(encodeURIComponent(p) + "=") ;
+		}
+	}
+	return str.join("&");
 }
 
 function getAttributeName() {
