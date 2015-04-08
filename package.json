@@ -30,12 +30,12 @@
   "dependencies": {
     "async": "^0.9.0",
     "cheerio": "~0.17.0",
-    "co": "^3.1.0",
     "debug": "*",
     "merge": "^1.1.3",
     "minimist": "~0.2.0",
     "request": "~2.37.0",
-    "thunkify": "^2.1.2"
+    "lodash": "*",
+    "ent": "*"
   },
   "devDependencies": {
     "grunt-contrib-jshint": "~0.6.4",
