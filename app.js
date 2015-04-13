@@ -20,7 +20,7 @@ runIt( function(err) {
 
 var $ ;
 
-var nm_general = [null,'entity','record_id',null,'category','form_of_payment','nature_of_payment','transaction_date',
+var nm_general = [null,'entity','record_id','dispute_id','category','form_of_payment','nature_of_payment','transaction_date',
 'amount','delay_in_pub','last_modified_date','current_standing','review_status','pi','pi_only',
 'dispute_date','dispute_last','affirmed'] ;
 
@@ -197,8 +197,16 @@ function getOnePageOfHcpData( hcp, page, numPages, callback ) {
 		var colCount = nm_general.length ;
 
 		for( var i = 0; i < colCount; i++ ) {
-			if( 0 === i || 3 === i ) { continue ; }
-			data[nm_general[i]] = $(this).find('td').eq(i).find('div').html() ;
+			if( 0 === i ) { continue ; }
+			if( 'dispute_id' === nm_general[i] ) {
+				data[nm_general[i]] = $(this).find('td').eq(i).find('div > a').html() ;
+			}
+			else if( 'review_status' === nm_general[i] || 'dispute_last' === nm_general[i] ) {
+				data[nm_general[i]] = $(this).find('td').eq(i).html() ;				
+			}
+			else {
+				data[nm_general[i]] = $(this).find('td').eq(i).find('div').html() ;
+			}
 		}
 
 		var js = $(this).find('td').eq(colCount+1).find('a').attr('onclick') ;
