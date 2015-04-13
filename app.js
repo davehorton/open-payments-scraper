@@ -499,7 +499,8 @@ function updateFormData() {
 function getAllHcpData( hcps, body, cb ) {
 
 	var tasks = [] ;
-	hcps.slice(8,9).forEach( function(hcp, idx){
+	//hcps.slice(8,9).forEach( function(hcp, idx){
+	hcps.forEach( function(hcp, idx){
 		if( 0 === idx ) {
 			tasks.push( function(callback) {
 				var obj = updateFormData() ;
