@@ -20,58 +20,113 @@ runIt( function(err) {
 
 var $ ;
 
+var fields = {
+	'Physician&apos;s First Name:' : 'first',
+	'Physician Middle Name:' : 'middle',
+	'Physician Last Name:' : 'last',
+	'Physician Name Suffix:' : 'suffix',
+	'Physician Business Street Address, Line 1:' : 'address1',
+	'Physician Business Street Address, Line 2:' : 'address2',
+	'Physician City:': 'city',
+	'Physician State:': 'state',
+	'Physician Zip Code:': 'zipcode',
+	'Physician Country:': 'country',
+	'Physician Province:': 'province',
+	'Physician Postal Code:': 'postal_code',
+	'Physician Email Address:': 'email',
+	'Physician Primary Type:': 'physician_type',
+	'Physician NPI:': 'npi',
+	'Physician Taxonomy Code:': 'taxonomy',
+	'Physician License State:' : 'lic_state',
+	'Physician License Number:': 'lic_no',
+	'Applicable Manufacturer or Applicable GPO Reporting Ownership Name:': 'man_gpo_name_reporting_ownership',
+	'Applicable Manufacturer or Applicable GPO Reporting Ownership Registration ID:': 'man_gpo_reg_id_reporting_ownership',
+	'Interest Held By:': 'interest_held_by',
+	'Dollar Amount Invested:': 'investment_amount',
+	'Value of Interest:': 'investment_value',
+	'Terms of Interest:': 'investment_terms',
+	'Product Indicator:' :'prod_indicator',
+	'Total Amount of Payment:': 'total_payment',
+	'Date of Payment:': 'date_payment',
+	'Number of Payments Included in Total Amount:' : 'num_payments',
+	'Form of Payment or Transfer of Value:': 'form_payment',
+	'Nature of Payment or Transfer of Value:': 'nature_payment',
+	'City of Travel:': 'city_travel',
+	'State of Travel:': 'state_travel',
+	'Country of Travel:': 'country_travel',
+	'Physician Ownership Indicator:': 'ownership_indicator',
+	'Third Party Payment Recipient Indicator:': 'third_party_payment',
+	'Name of Third Party Entity Receiving Payment or Transfer of Value:': 'third_party_name',
+	'Charity Indicator:': 'charity',
+	'Third Party Equals Covered Recipient Indicator:': 'third_party_is_covered_recip',
+	'Delay in Publication of Research Payment Indicator:': 'delay_in_pub',
+	'Contextual Information:': 'contextual_info',
+	'Covered Recipient Type:': 'covered_recipient_type',
+	'Recipient Type:': 'recipient_type',
+	'Physician First Name:': 'first',
+	'Recipient Business Street Address, Line 1:': 'recipient_address1',
+	'Recipient Business Street Address, Line 2:': 'recipient_address2',
+	'Recipient City:': 'recipient_city',
+	'Recipient State:': 'recipient_state',
+	'Recipient Zip Code:': 'recipient_zipcode',
+	'Recipient Country:': 'recipient_country',
+	'Recipient Province:': 'recipient_province',
+	'Recipient Postal Code:': 'recipient_postal_code',
+	'Recipient Email Address:': 'recipient_email',
+	'Applicable Manufacturer or Applicable GPO Making Payment Name:': 'man_gpo_name_making_payment',
+	'Applicable Manufacturer or Applicable GPO Making Payment Registration ID:': 'man_gpo_reg_id_making_payment',
+	'Non-Covered Recipient Entity Name:': 'non_covered_entity',
+	'Product indicator:': 'prod_indicator',
+	'NDC of Associated Covered Drug or Biological:': 'ndc_code',
+	'Name of Associated Covered Device or Medical Supply:': 'name_device',
+	'Name of Associated Drug or Biological:': 'name_drug',
+	'Total Amount of Research Payment:': 'total_research_payment',
+	'Professional Salary Support:': 'salary_support',
+	'Medical Research Writing or Publication:': 'research_writing_or_pub',
+	'Patient Care:': 'patient_care',
+	'Non-patient Care:': 'non_patient_care',
+	'Overhead:': 'overhead',
+	'Other:': 'other',
+	'Pre-clinical Research Indicator:': 'pre_clinical_indicator',
+	'Name of Study:': 'study_name',
+	'Context of Research:': 'research_context',
+	'ClinicalTrials.Gov Identifier:' : 'clinical_trial_identifier',
+	'Research Information Link:': 'research_link',
+	'Principal Investigator Covered Recipient Physician Indicator:': 'pi_covered',
+	'National Drug Code of Associated Covered Drug or Biological:' : 'ndc_code',
+	'Principal Investigator First Name:': 'pi_first',
+	'Principal Investigator Middle Name:': 'pi_middle',
+	'Principal Investigator Last Name:': 'pi_last',
+	'Principal Investigator Suffix:': 'pi_suffix',
+	'Principal Investigator Business Street Address, Line 1:': 'pi_address1',
+	'Principal Investigator Business Street Address, Line 2:': 'pi_address2',
+	'Principal Investigator Business City:':'pi_city',
+	'Principal Investigator State:': 'pi_state',
+	'Principal Investigator Zip Code:': 'pi_zipcode',
+	'Principal Investigator Country:': 'pi_country',
+	'Principal Investigator Province:': 'pi_province',
+	'Principal Investigator Postal Code:': 'pi_postal_code',
+	'Principal Investigator Physician Primary Type:': 'pi_primary_type',
+	'Principal Investigator NPI:': 'pi_npi',
+	'Principal Investigator Taxonomy Code:': 'pi_taxonomy',
+	'Principal Investigator License State:': 'pi_lic_state',
+	'Principal Investigator License Number:': 'pi_lic_no',
+	'Covered Recipient Physician First Name:': 'covered_recipient_first',
+	'Covered Recipient Physician Middle Name:': 'covered_recipient_middle',
+	'Covered Recipient Physician Last Name:': 'covered_recipient_last',
+	'Covered Recipient Physician Name Suffix:': 'covered_recipient_suffix',
+	'Covered Recipient Physician NPI:': 'covered_recipient_npi',
+	'Covered Recipient Physician Primary Type:': 'covered_recipient_primary_type',
+	'Covered Recipient Physician Taxonomy Code:': 'covered_recipient_taxonomy',
+	'Covered Recipient Physician License Number:': 'covered_recipient_lic_no',
+	'Covered Recipient Physician License State:' : 'covered_recipient_lic_state',
+	'Covered-Recipient Teaching Hospital Name:': 'covered_recipient_teaching_hospital_name',
+	'Covered Recipient Teaching Hospital Taxpayer ID Number (TIN):': 'covered_recipient_teaching_hospital_tax_id'
+} ;
+
 var nm_general = [null,'entity','record_id','dispute_id','category','form_of_payment','nature_of_payment','transaction_date',
 'amount','delay_in_pub','last_modified_date','current_standing','review_status','pi','pi_only',
 'dispute_date','dispute_last','affirmed'] ;
-
-var nm_research_teaching = ['res_recipient_type','res_teaching_hospital_name','res_teaching_hospital_taxpayer_id','res_prod_indicator','res_ndc_code',
-'res_name_device',
-'res_name_drug','res_man_gpo_name','res_man_gpo_reg_id','res_total_payment','res_date_payment','res_form_of_payment','res_salary_support',
-'res_research_writing_or_pub',
-'res_patient_care','res_non_patient_care','res_overhead','res_research_other','res_pre_clinical_indicator','res_delay_in_pub',
-'res_study_name',
-'res_research_context','res_clinical_trial_identifier','res_research_link','res_pi_covered',null,
-'res_pi_first','res_pi_middle','res_pi_last','res_pi_suffix','res_pi_address1','res_pi_address2','res_pi_city','res_pi_state','res_pi_zipcode',
-'res_pi_country','res_pi_province','res_pi_postal_code','res_pi_primary_type','res_pi_npi','res_pi_taxonomy',
-'res_pi_license_state1','res_pi_license_number1','res_pi_license_state2','res_pi_license_number2','res_pi_license_state3','res_pi_license_number3',
-'res_pi_license_state4','res_pi_license_number4','res_pi_license_state5','res_pi_license_number5'] ;
-
-var nm_research_non_covered_entity = ['res_recipient_type','res_non_covered_entity','res_prod_indicator','res_ndc_code',
-'res_name_device',
-'res_name_drug','res_man_gpo_name','res_man_gpo_reg_id','res_total_payment','res_date_payment','res_form_of_payment','res_salary_support',
-'res_research_writing_or_pub',
-'res_patient_care','res_non_patient_care','res_overhead','res_research_other','res_pre_clinical_indicator','res_delay_in_pub',
-'res_study_name',
-'res_research_context','res_clinical_trial_identifier','res_research_link','res_pi_covered',null,
-'res_pi_first','res_pi_middle','res_pi_last','res_pi_suffix','res_pi_address1','res_pi_address2','res_pi_city','res_pi_state','res_pi_zipcode',
-'res_pi_country','res_pi_province','res_pi_postal_code','res_pi_primary_type','res_pi_npi','res_pi_taxonomy',
-'res_pi_license_state1','res_pi_license_number1','res_pi_license_state2','res_pi_license_number2','res_pi_license_state3','res_pi_license_number3',
-'res_pi_license_state4','res_pi_license_number4','res_pi_license_state5','res_pi_license_number5'] ;
-
-var nm_research_covered_physician = ['res_recipient_type','res_pi_first','res_pi_middle','res_pi_last','res_pi_suffix','res_pi_address1','res_pi_address2','res_pi_city','res_pi_state','res_pi_zipcode',
-'res_pi_country','res_pi_province','res_pi_postal_code','res_email','res_pi_npi','res_pi_primary_type','res_pi_taxonomy',
-'res_pi_license_number1','res_pi_license_state1','res_pi_license_number2','res_pi_license_state2','res_pi_license_number3','res_pi_license_state3',
-'res_pi_license_number4','res_pi_license_state4','res_pi_license_number5','res_pi_license_state5',
-'res_prod_indicator',
-'res_ndc_code','res_name_device','res_name_drug',
-'res_man_gpo_name','res_man_gpo_reg_id','res_total_payment','res_date_payment','res_form_of_payment','res_salary_support',
-'res_research_writing_or_pub','res_patient_care','res_non_patient_care','res_overhead','res_research_other',
-'res_pre_clinical_indicator','res_delay_in_pub','res_study_name','res_research_context','res_clinical_trial_identifier',
-'res_research_link','res_pi_covered'] ;
-
-var nm_payments = ['pay_recipient_type','pay_first','pay_middle','pay_last','pay_suffix','pay_address1',
-'pay_address2','pay_city','pay_state','pay_zipcode','pay_country','pay_province','pay_postal_code','pay_email','pay_physician_type',
-'pay_npi','pay_taxonomy','pay_lic_state1','pay_lic_no1','pay_lic_state2','pay_lic_no2','pay_lic_state3','pay_lic_no3',
-'pay_lic_state4','pay_lic_no4','pay_lic_state5','pay_lic_no5','pay_prod_indicator',
-'pay_natl_drug_code','pay_name_drug','pay_name_device','pay_man_gpo_name','pay_man_gpo_reg_id','pay_total_payment','pay_date_payment','pay_num_payments',
-'pay_form_payment','pay_nature_payment','pay_city_travel','pay_state_travel','pay_country_travel',
-'pay_ownership_indicator','pay_third_party_payment','pay_third_party_name','pay_charity','pay_third_party_is_covered_recip',
-'pay_delay_in_pub','pay_contextual_info'] ;
-
-var nm_investments = ['inv_first','inv_middle','inv_last','inv_suffix','inv_address1','inv_address2','inv_city','inv_state','inv_zipcode','inv_country',
-'inv_province','inv_postal_code','inv_email','inv_physician_type','inv_npi','inv_taxonomy','inv_','inv_lic_no1','inv_lic_state2','inv_lic_no2',
-'inv_lic_state3','inv_lic_no3','inv_lic_state4','inv_lic_no4','inv_lic_state5','inv_lic_no5','inv_man_gpo_name',
-'inv_man_gpo_reg_id','inv_interest_held_by','inv_investment_amount','inv_investment_value','inv_investment_terms'] ;
 
 
 function runIt( callback ) {
@@ -182,6 +237,34 @@ function runIt( callback ) {
 		}) ;
 	}) ;
 }
+function getLicCount( obj, colName ) {
+	for( var i = 1; i < 6; i++ ) {
+
+		if( !obj[colName + i] || 0 === obj[colName + i].length ) return i ;
+	}
+	return 5 ;
+}
+
+function saveItem( obj, prefix, name, value ) {
+
+	if( value && value.length > 0 ) {
+		switch( name ) {
+			case 'pi_lic_state':
+			case 'pi_lic_no':
+			case 'lic_state':
+			case 'lic_no':
+			case 'covered_recipient_lic_state':
+			case 'covered_recipient_lic_no':
+				obj[ prefix + name + getLicCount( obj, name ) ] = value ;
+				return;
+				break ;
+
+			default:
+				break ;
+		}
+	}
+	obj[ prefix + name ] = value ;
+}
 
 function getOnePageOfHcpData( hcp, page, numPages, callback ) {
 	console.log('retrieving data for page ' + page + ' of ' + numPages + ' for ' + hcp.name) ;
@@ -238,9 +321,6 @@ function getOnePageOfHcpData( hcp, page, numPages, callback ) {
 			var recordId = $('.GettingStarted > .LeftSide > .TabContent > .TextArea > .ProfileResults > h1') ;
 			if( null == recordId.html() ) {
 				console.error('Error: could not find detail for ' + txn.data.entity + ' for recordId ' + txn.data.record_id) ;
-				nm_payments.forEach( function(attr){
-					txn.data[attr] = 'detail N/A' ;
-				}) ;
 				form = $('form') ;
 				return cb(null) ;
 			}
@@ -248,94 +328,61 @@ function getOnePageOfHcpData( hcp, page, numPages, callback ) {
 			debug('got detail page for %s', recordId.html().trim()) ;
 			var div = $('.GettingStarted > .LeftSide > .TabContent > .TextArea > .ProfileResults > span.textClass > .grid_625');
 			var h2 = $('.GettingStarted > .LeftSide > .TabContent > .TextArea > .ProfileResults > h2');
+			var prefix = '' ;
 			if( h2.length === 4 && h2.eq(3).html().trim() === 'Research Related Information') {
 				//research have 4 sections on the page:
 				//Recipient Demographic Information; Associated Drug, Device, Biological, or Medical Supply Information; 
 				//Recipient Demographic Information; Research Related Information
-				var names = nm_research_teaching ;
-				div.each( function(idx, d){
-					var span = $(d).find('span') ;
-					if( !!span && span.children.length && 3 === d.children.length) {
-						var text = d.children[2].data.trim() ; 
-						if( idx < names.length && names[idx] !== null ) { 
-							txn.data[names[idx]] = text ; 
-						}
-						if( 0 === idx ) {
-							debug('Recipient Type: %s', text) ;
-							if( text !== 'Covered Recipient Teaching Hospital' ) {
-								if( text === 'Covered Recipient Physician') {
-									names = nm_research_covered_physician ;
-								}
-								else {
-									names = nm_research_non_covered_entity ;
-								}
-							}
-						}
-					}
-					else if( !!span ) {
-						//search for list of items
-						var li = $(d).find('ul li.listSameLine') ;
-						if( !!li ) {
-							var text2 = '' ;
-							li.each( function(idx, item){
-								text2 +=  $(item).html().trim() ;
-							}) ;	
-							txn.data[names[idx]] = text2 ;													
-						}
-					}
-				}) ;
-			} else if( h2.length === 4 ) {
+				prefix = 'res_' ;
+			}
+			else if( h2.length === 4 ) {
 				//payments have 4 sections on the page:
 				//Recipient Demographic Information; Associated Drug, Device, Biological, or Medical Supply Information; 
 				//Transfer of Value (Payment) Information; General Record Information
-				div.each( function(idx, d){
-					var span = $(d).find('span') ;
-					if( !!span && span.children.length && 3 === d.children.length) {
-						var text3 = d.children[2].data.trim() ; 
-						if( idx < nm_payments.length && nm_payments[idx] !== null ) { 
-							txn.data[nm_payments[idx]] = text3 ; 
-						}
-					}
-					else if( !!span ) {
-						//search for list of items
-						var li = $(d).find('ul li.listSameLine') ;
-						if( !!li ) {
-							var text = '' ;
-							li.each( function(idx, item){
-								text +=  $(item).html().trim() ;
-							}) ;	
-							txn.data[nm_payments[idx]] = text ;													
-						}
-					}
-				}) ;
+				prefix = 'pay_' ;
 			}
 			else if( h2.length === 2 ) {
 				//investments have 2 sections on the page:
 				//Recipient Demographic Information; Ownership or Investment Information
-				div.each( function(idx, d) {
-					var span = $(d).find('span') ;
+				prefix = 'inv_' ;
+			}
+			if( !prefix ) throw new Error('unknown detail page') ;
+			div.each( function(idx, d){
+				var span = $(d).find('span') ;
+				try {
+
 					if( !!span && span.children.length && 3 === d.children.length) {
 						var text = d.children[2].data.trim() ; 
-						if( idx < nm_investments.length && nm_investments[idx] !== null ) {
-							txn.data[nm_investments[idx]] = text ;
-						}
+						var title = span.html().trim() ;
+						if( !( title in fields ) ) throw new Error('Unexpected/unknown detail field: ' + title) ;
+
+						saveItem( txn.data, prefix, fields[title], text) ;
 					}
 					else if( !!span ) {
 						//search for list of items
-						var li = $(d).find('ul li.listSameLine') ;
-						if( !!li ) {
-							var text4 = '' ;
-							li.each( function(idx, item){
-								text4 +=  $(item).html().trim() ;
-							}) ;	
-							txn.data[nm_investments[idx]] = text4 ;													
+						var  title2 =  d.children[0].data.trim() ;
+						var value = span.html().trim() ;
+						if( title2 in fields ) {
+							txn.data[ prefix + fields[ title2 ] ] = value ;
 						}
+						else {
+							var li = $(d).find('ul li.listSameLine') ;
+							if( !!li ) {
+								value = '' ;
+								li.each( function(idx, item){
+									value +=  $(item).html().trim() ;
+								}) ;	
+								var title2 = span.html().trim() ;
+								if( !( title2 in fields ) ) throw new Error('Unexpected/unknown detail field: \'' + title2 + '\': ' + value ) ;
+								txn.data[ prefix + fields[title2] ] = value ;		
+							}
+						}
+						//debug('nested deal: %s: %s', title2, value ) ;
 					}
-				}) ;
-			}
-			else {
-				console.error('unknown detail page type for recordId: ' + recordId.html().trim() + '!') ;
-			}
+				} catch( e ) {
+					console.error('Caught error: ' + e) ;
+				}
+			}) ;
 
 			//back
 			form = $('form') ;
@@ -499,7 +546,7 @@ function updateFormData() {
 function getAllHcpData( hcps, body, cb ) {
 
 	var tasks = [] ;
-	//hcps.slice(8,9).forEach( function(hcp, idx){
+	//hcps.slice(3,4).forEach( function(hcp, idx){
 	hcps.forEach( function(hcp, idx){
 		if( 0 === idx ) {
 			tasks.push( function(callback) {
@@ -565,7 +612,7 @@ function getAllHcpData( hcps, body, cb ) {
 	}) ;
 }
 function nodatafound( body ) {
-	return  -1 !== body.indexOf('There are no payments or other transfers of value') ;
+	return  !body || -1 !== body.indexOf('There are no payments or other transfers of value') ;
 }
 
 function r( opts, callback ) {
@@ -629,8 +676,8 @@ function logOutput( err, response, body, opts, callback ) {
 
 function writeHcpData( hcps, done ) {
 	//debug('time to write hcp data: ', JSON.stringify(hcps)) ;
-	var names = getAttributeName() ;
 
+	var names = getAttributeName(hcps) ;
 	async.eachSeries( hcps, function(hcp, cb){
 		var filename = argv.outdir + '/' + hcp.name.toLowerCase().replace(/ /g,'_') + '.csv' ;
 		debug('writing data for %s to %s', hcp.name, filename) ;
@@ -678,6 +725,48 @@ function serialize(obj) {
 	return str.join("&");
 }
 
-function getAttributeName() {
-	return _.uniq(_.compact( nm_general.concat( nm_investments, nm_payments, nm_research_teaching, nm_research_non_covered_entity ) ) ); 
+function getAttributeName(hcps) {
+	return  [ 'entity', 'record_id', 'dispute_id', 'category', 'form_of_payment', 'nature_of_payment', 'transaction_date', 
+	'amount', 'delay_in_pub', 'last_modified_date', 'current_standing', 'review_status', 'pi', 'pi_only', 'dispute_date', 
+	'dispute_last', 'affirmed', 'inv_first', 'inv_middle', 'inv_last', 'inv_suffix', 'inv_address1', 'inv_address2', 'inv_city', 
+	'inv_state', 'inv_zipcode', 'inv_country', 'inv_province', 'inv_postal_code', 'inv_email', 'inv_physician_type', 'inv_npi', 
+	'inv_taxonomy', 
+	'inv_lic_state1', 'inv_lic_no1', 
+	'inv_lic_state2', 'inv_lic_no2', 
+	'inv_lic_state3', 'inv_lic_no3', 
+	'inv_lic_state4', 'inv_lic_no4', 
+	'inv_lic_state5', 'inv_lic_no5', 
+	'inv_man_gpo_name_reporting_ownership', 
+	'inv_man_gpo_reg_id_reporting_ownership', 'inv_interest_held_by', 'inv_investment_amount', 'inv_investment_value', 
+	'inv_investment_terms', 'pay_covered_recipient_type', 'pay_first', 'pay_middle', 'pay_last', 'pay_suffix', 'pay_recipient_address1', 
+	'pay_recipient_address2', 'pay_recipient_city', 'pay_recipient_state', 'pay_recipient_zipcode', 'pay_recipient_country', 'pay_recipient_province', 
+	'pay_recipient_postal_code', 'pay_recipient_email', 'pay_physician_type', 'pay_npi', 'pay_taxonomy', 
+	'pay_lic_state1', 'pay_lic_no1', 
+	'pay_lic_state2', 'pay_lic_no2', 
+	'pay_lic_state3', 'pay_lic_no3', 
+	'pay_lic_state4', 'pay_lic_no4', 
+	'pay_lic_state5', 'pay_lic_no5', 
+	'pay_prod_indicator', 'pay_ndc_code', 'pay_name_drug', 
+	'pay_name_device', 'pay_man_gpo_name_making_payment', 'pay_man_gpo_reg_id_making_payment', 'pay_total_payment', 'pay_date_payment', 'pay_num_payments', 
+	'pay_form_payment', 'pay_nature_payment', 'pay_city_travel', 'pay_state_travel', 'pay_country_travel', 'pay_ownership_indicator', 
+	'pay_third_party_payment', 'pay_third_party_name', 'pay_charity', 'pay_third_party_is_covered_recip', 'pay_delay_in_pub', 
+	'pay_contextual_info', 'res_recipient_type', 'res_non_covered_entity', 'res_prod_indicator', 'res_ndc_code', 'res_name_device', 
+	'res_name_drug', 'res_man_gpo_name_making_payment', 'res_man_gpo_reg_id_making_payment','res_total_research_payment', 'res_date_payment', 'res_form_payment', 
+	'res_salary_support', 'res_research_writing_or_pub', 'res_patient_care', 'res_non_patient_care', 'res_overhead', 'res_other', 
+	'res_pre_clinical_indicator', 'res_delay_in_pub', 'res_study_name', 'res_research_context', 'res_clinical_trial_identifier', 
+	'res_research_link', 'res_pi_covered', 'res_pi_first', 'res_pi_middle', 'res_pi_last', 'res_pi_suffix', 'res_pi_address1', 
+	'res_pi_address2', 'res_pi_city', 'res_pi_state', 'res_pi_zipcode', 'res_pi_country', 'res_pi_province', 'res_pi_postal_code', 
+	'res_pi_primary_type', 'res_pi_npi', 'res_pi_taxonomy', 
+	'res_pi_lic_state1', 'res_pi_lic_no1',
+	'res_pi_lic_state2', 'res_pi_lic_no2',
+	'res_pi_lic_state3', 'res_pi_lic_no3',
+	'res_pi_lic_state4', 'res_pi_lic_no4',
+	'res_pi_lic_state5', 'res_pi_lic_no5',
+	'res_covered_recipient_teaching_hospital_name', 'res_covered_recipient_teaching_hospital_tax_id', 
+	'res_covered_recipient_first', 'res_covered_recipient_middle', 'res_covered_recipient_last', 
+	'res_covered_recipient_suffix', 'res_recipient_address1','res_recipient_address2', 'res_recipient_city', 'res_recipient_state', 
+	'res_recipient_zipcode', 'res_recipient_country', 'res_recipient_province', 'res_recipient_postal_code', 
+	'res_recipient_email', 'res_covered_recipient_npi', 'res_covered_recipient_primary_type', 'res_covered_recipient_taxonomy', 
+	'res_covered_recipient_lic_no1', 'res_covered_recipient_lic_state1', 'res_covered_recipient_lic_no', 
+	'res_covered_recipient_lic_state' ] ;
 }
