@@ -5,7 +5,7 @@ var debug = require('debug')('open-payments') ;
 var merge = require('merge') ;
 var argv = require('minimist')(process.argv.slice(2)) ;
 var fs = require('fs') ;
-var _ = require('lodash') ;
+var _ = require('underscore') ;
 var ent = require('ent') ;
 
 if( argv.length < 2 || !argv.user || !argv.password ) {
@@ -218,7 +218,6 @@ function runIt( callback ) {
 									hcps.push({
 										name: $(this).html(),
 										org: $(this).attr('value'), 
-										data: [],
 										transactions: []
 									}) ;
 								}) ;
@@ -240,30 +239,35 @@ function runIt( callback ) {
 function getLicCount( obj, colName ) {
 	for( var i = 1; i < 6; i++ ) {
 
-		if( !obj[colName + i] || 0 === obj[colName + i].length ) return i ;
+		if( !obj[colName + i] || 0 === obj[colName + i].length ) { return i;  }
 	}
 	return 5 ;
 }
 
 function saveItem( obj, prefix, name, value ) {
 
-	if( value && value.length > 0 ) {
-		switch( name ) {
-			case 'pi_lic_state':
-			case 'pi_lic_no':
-			case 'lic_state':
-			case 'lic_no':
-			case 'covered_recipient_lic_state':
-			case 'covered_recipient_lic_no':
+	switch( name ) {
+		case 'pi_lic_state':
+		case 'pi_lic_no':
+		case 'lic_state':
+		case 'lic_no':
+		case 'covered_recipient_lic_state':
+		case 'covered_recipient_lic_no':
+			if( value && value.length > 0 ) {
 				obj[ prefix + name + getLicCount( obj, name ) ] = value ;
-				return;
-				break ;
+			}
+			return;
 
-			default:
-				break ;
-		}
+		default:
+			break ;
 	}
-	obj[ prefix + name ] = value ;
+	var prop = prefix + name ;
+	if( !( prop in obj ) ) {
+		obj[prop] = value ;
+	}
+	else {
+		debug('not saving %s as we already have a value', prop); 
+	}
 }
 
 function getOnePageOfHcpData( hcp, page, numPages, callback ) {
@@ -292,6 +296,7 @@ function getOnePageOfHcpData( hcp, page, numPages, callback ) {
 			}
 		}
 
+		//detail link
 		var js = $(this).find('td').eq(colCount+1).find('a').attr('onclick') ;
 		var re = /jsfcljs\(document.forms\['(\S+)'],{'(\S+)':'(\S+)'/ ;
 		var arr = re.exec( js ) ;
@@ -300,9 +305,22 @@ function getOnePageOfHcpData( hcp, page, numPages, callback ) {
 		obj[arr[1]] = arr[1] ;
 		obj[arr[2]] = arr[2] ;
 
+		//dispute history link
+		js = $(this).find('td').eq(colCount).find('a').attr('onclick') ;
+		re = /jsfcljs\(document.forms\['(\S+)'],{'(\S+)':'(\S+)'/ ;
+		arr = re.exec( js ) ;
+
+		var obj2 ;
+		if( arr ) {
+			obj2 = {} ;
+			obj2[arr[1]] = arr[1] ;
+			obj2[arr[2]] = arr[2] ;
+		}
+
 		hcp.transactions.push({
 			data: data,
-			detail_form_data: obj 
+			detail_form_data: obj,
+			dispute_form_data: obj2
 		}) ;
 	}) ;
 
@@ -325,7 +343,10 @@ function getOnePageOfHcpData( hcp, page, numPages, callback ) {
 				return cb(null) ;
 			}
 
-			debug('got detail page for %s', recordId.html().trim()) ;
+			debug('got detail page for \'%s\'', recordId.html().trim()) ;
+			if( 'Record ID: 215233110' === recordId.html().trim() ) {
+				debug('got ansel record'); 
+			}
 			var div = $('.GettingStarted > .LeftSide > .TabContent > .TextArea > .ProfileResults > span.textClass > .grid_625');
 			var h2 = $('.GettingStarted > .LeftSide > .TabContent > .TextArea > .ProfileResults > h2');
 			var prefix = '' ;
@@ -346,16 +367,21 @@ function getOnePageOfHcpData( hcp, page, numPages, callback ) {
 				//Recipient Demographic Information; Ownership or Investment Information
 				prefix = 'inv_' ;
 			}
-			if( !prefix ) throw new Error('unknown detail page') ;
+			if( !prefix ) { throw new Error('unknown detail page') ; }
 			div.each( function(idx, d){
+				if( $(d).hasClass('marginTp20') ) {
+					//headings
+					return ;
+				}
 				var span = $(d).find('span') ;
 				try {
 
 					if( !!span && span.children.length && 3 === d.children.length) {
 						var text = d.children[2].data.trim() ; 
 						var title = span.html().trim() ;
-						if( !( title in fields ) ) throw new Error('Unexpected/unknown detail field: ' + title) ;
+						if( !( title in fields ) ) { throw new Error('Unexpected/unknown detail field: ' + title) ; }
 
+						//debug('saving %s', title) ;
 						saveItem( txn.data, prefix, fields[title], text) ;
 					}
 					else if( !!span ) {
@@ -363,7 +389,9 @@ function getOnePageOfHcpData( hcp, page, numPages, callback ) {
 						var  title2 =  d.children[0].data.trim() ;
 						var value = span.html().trim() ;
 						if( title2 in fields ) {
-							txn.data[ prefix + fields[ title2 ] ] = value ;
+							//debug('saving %s', title2) ;
+							saveItem( txn.data, prefix, fields[title2], value) ;
+							//txn.data[ prefix + fields[ title2 ] ] = value ;
 						}
 						else {
 							var li = $(d).find('ul li.listSameLine') ;
@@ -372,9 +400,13 @@ function getOnePageOfHcpData( hcp, page, numPages, callback ) {
 								li.each( function(idx, item){
 									value +=  $(item).html().trim() ;
 								}) ;	
-								var title2 = span.html().trim() ;
-								if( !( title2 in fields ) ) throw new Error('Unexpected/unknown detail field: \'' + title2 + '\': ' + value ) ;
-								txn.data[ prefix + fields[title2] ] = value ;		
+								var title3 = span.html().trim() ;
+								if( !( title3 in fields ) ) {
+									throw new Error('Unexpected/unknown detail field: \'' + title3 + '\': ' + value ) ;
+								}
+								//debug('saving %s', title3) ;
+								saveItem( txn.data, prefix, fields[title3], value) ;
+								//txn.data[ prefix + fields[title3] ] = value ;		
 							}
 						}
 						//debug('nested deal: %s: %s', title2, value ) ;
@@ -402,7 +434,77 @@ function getOnePageOfHcpData( hcp, page, numPages, callback ) {
 			}, function(err){
 				if( err ) { return cb(err) ; }
 				form = $('form') ;
-				cb(null) ;
+
+				//back on general page
+
+				//now get dispute detail, if exists 
+				if( txn.dispute_form_data ) {
+					var vs = form.find('input[name="javax.faces.ViewState"]').attr('value') ;
+					r({
+						uri: 'https://portal.cms.gov' + form.attr('action'),
+						method: 'POST',
+						form: merge( txn.dispute_form_data, {'javax.faces.ViewState': vs})
+					}, function(err){
+						if( err ) { return cb(err) ; }
+						debug('got dispute history page for %s', recordId.html().trim()) ;
+
+						//parse into one big object that we can jsonify
+						var tr = $('.GettingStarted > .LeftSide > .TabContent > .TextArea table > tbody > tr');
+						var disputes = [] ;
+						tr.each( function(idx, row){
+							var td = $(row).find('td') ;
+							var d = {} ;
+							td.each( function(i, data){
+								var value = $(data).find('div').html() ;
+								var nm ;
+								switch(i) {
+									case 0: nm = 'id'; break ;
+									case 1: nm = 'status'; break ;
+									case 2: nm = 'recordStatus'; break ;
+									case 3: nm = 'amount'; break ;
+									case 4: nm = 'paymentDate'; break ;
+									case 5: nm = 'entity'; break ;
+									case 6: nm = 'dateInitiated'; break ;
+									case 7: nm = 'dateModified'; break ;
+									case 8: nm = 'lastModifiedBy'; break ;
+									case 9: nm = 'comments'; break ;
+									default: 
+										console.error('unexpected dispute column: ' + i) ;
+										break ;
+								}
+								if( nm ) { d[nm] = value ; }
+							}) ;
+							disputes.push( d ) ;
+						}) ;
+						//debug('dispute JSON: %s', JSON.stringify(disputes));
+						txn.disputeHistory = disputes ;
+
+						form = $('form') ;
+						formId = form.attr('id') ;
+						button = form.find('.ButtonRow .leftSide input[type=submit]') ;
+						vs = $('input[name="javax.faces.ViewState"]').attr('value') ;
+
+						fd = {} ;
+						fd['javax.faces.ViewState'] = vs ;
+						fd[formId] = formId ;
+						fd[button.attr('name')] = 'Back' ;
+
+						r({
+							uri: 'https://portal.cms.gov' + form.attr('action'),
+							method: 'POST',
+							form: fd
+						}, function(err){
+							if( err ) { return cb(err) ; }
+							form = $('form') ;
+
+							//back on general page
+							cb(null); 
+						}) ;
+					}) ;
+				}
+				else {
+					cb(null) ;
+				}
 			}) ;
 		}); 
 	}, function(err){
@@ -546,7 +648,7 @@ function updateFormData() {
 function getAllHcpData( hcps, body, cb ) {
 
 	var tasks = [] ;
-	//hcps.slice(3,4).forEach( function(hcp, idx){
+	//hcps.slice(9,10).forEach( function(hcp, idx){
 	hcps.forEach( function(hcp, idx){
 		if( 0 === idx ) {
 			tasks.push( function(callback) {
@@ -677,26 +779,49 @@ function logOutput( err, response, body, opts, callback ) {
 function writeHcpData( hcps, done ) {
 	//debug('time to write hcp data: ', JSON.stringify(hcps)) ;
 
-	var names = getAttributeName(hcps) ;
-	async.eachSeries( hcps, function(hcp, cb){
-		var filename = argv.outdir + '/' + hcp.name.toLowerCase().replace(/ /g,'_') + '.csv' ;
+	//var names = getAttributeName(hcps) ;
+	async.eachSeries( hcps, function(hcp, cb) {
+		var filename = argv.outdir + '/' + hcp.name.toLowerCase().replace(/ /g,'_') + '.json' ;
 		debug('writing data for %s to %s', hcp.name, filename) ;
 		var stream = fs.createWriteStream(filename);
-		stream.once('open', function(){
-			stream.write(names.join(',') + '\n') ;
+		stream.once('open', function() {
+			var h = {
+				name: hcp.name,
+				org: hcp.org,
+				transactions: _.map( hcp.transactions, function(txn) { 
+					return {
+						data: txn.data,
+						disputes: txn.disputeHistory || []
+					} ;
+				}) 
+			} ;
+			stream.write(JSON.stringify(h)) ;
+			/*
+			stream.write(names.join('\t') + '\n') ;
 			hcp.transactions.forEach( function(txn){
 				names.forEach( function(name, idx) {
-					if( 0 !== idx ) { stream.write(',') ; }
+					if( 0 !== idx ) { stream.write('\t') ; }
 
-					if( txn.data[name] ) { 
+					if( name === 'dispute_history' ) {
+						if( txn.disputeHistory ) {
+							stream.write( JSON.stringify(txn.disputeHistory).replace(/"/g,'\"').replace(/\t/g,'   ')) ;
+						}
+						else {
+							stream.write( JSON.stringify( [] ) ) ;	
+						}
+					}
+					else if( txn.data[name] ) { 
 						stream.write('"' + ent.decode( txn.data[name] ) + '"') ;
 					}
 					else { 
 						stream.write('') ;
 					}
 				}) ;
+
 				stream.write('\n') ;
-			}) ;
+				*/
+			
+		//	}) ;
 			stream.end() ;
 		}) ;
 		stream.on('finish', function() {
@@ -725,7 +850,7 @@ function serialize(obj) {
 	return str.join("&");
 }
 
-function getAttributeName(hcps) {
+function getAttributeName() {
 	return  [ 'entity', 'record_id', 'dispute_id', 'category', 'form_of_payment', 'nature_of_payment', 'transaction_date', 
 	'amount', 'delay_in_pub', 'last_modified_date', 'current_standing', 'review_status', 'pi', 'pi_only', 'dispute_date', 
 	'dispute_last', 'affirmed', 'inv_first', 'inv_middle', 'inv_last', 'inv_suffix', 'inv_address1', 'inv_address2', 'inv_city', 
@@ -767,6 +892,11 @@ function getAttributeName(hcps) {
 	'res_covered_recipient_suffix', 'res_recipient_address1','res_recipient_address2', 'res_recipient_city', 'res_recipient_state', 
 	'res_recipient_zipcode', 'res_recipient_country', 'res_recipient_province', 'res_recipient_postal_code', 
 	'res_recipient_email', 'res_covered_recipient_npi', 'res_covered_recipient_primary_type', 'res_covered_recipient_taxonomy', 
-	'res_covered_recipient_lic_no1', 'res_covered_recipient_lic_state1', 'res_covered_recipient_lic_no', 
-	'res_covered_recipient_lic_state' ] ;
+	'res_covered_recipient_lic_no1', 'res_covered_recipient_lic_state1', 
+	'res_covered_recipient_lic_no2', 'res_covered_recipient_lic_state2', 
+	'res_covered_recipient_lic_no3', 'res_covered_recipient_lic_state3', 
+	'res_covered_recipient_lic_no4', 'res_covered_recipient_lic_state4', 
+	'res_covered_recipient_lic_no5', 'res_covered_recipient_lic_state5', 
+	'res_covered_recipient_lic_state',
+	'dispute_history' ] ;
 }
